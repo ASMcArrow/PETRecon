@@ -14,12 +14,23 @@ public:
 
 private:
     void SortToSinogram2D(unsigned short ***sinogram3D);
-    void ApplyFilter();
-    void Reconstruct();
+    void CalculateFilter();
+    void FFT();
+    void BackProject(int slice);
+
 
     float*** Sinogram2D;
     float*** Image;
     PETParameters* Parameters;
+    int inputFFTSize;
+    int outputFFTSize;
+    double* Filter;
+
+    double Offset;
+    double* Costheta;
+    double* Sintheta;
+    double** XArray;
+    double** YArray;
 };
 
 #endif // FILTEREDBACKPROJECTION_HH
