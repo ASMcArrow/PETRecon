@@ -25,16 +25,17 @@ using namespace std;
 
 FilteredBackProjection::FilteredBackProjection(unsigned short*** sinogram3D, PETParameters* parameters)
 {
+    MaxBrightness = 0;
     Parameters = parameters;
 
     // Initialization of the image = TanBinNum x TanBinNum x Slices matrix
-    Image = new float**[Parameters->GetTanBinNum()];
+    Image = new double**[Parameters->GetTanBinNum()];
     for(int i = 0; i < Parameters->GetTanBinNum(); i++)
     {
-        Image[i] = new float*[Parameters->GetTanBinNum()];
+        Image[i] = new double*[Parameters->GetTanBinNum()];
         for(int j = 0;j < Parameters->GetTanBinNum(); j++)
         {
-            Image[i][j] = new float[Parameters->GetTotPlanes()];
+            Image[i][j] = new double[Parameters->GetTotPlanes()];
             for(int k = 0; k < Parameters->GetRingNum(); k++)
             {
                 Image[i][j][k] = 0.0;
@@ -42,7 +43,7 @@ FilteredBackProjection::FilteredBackProjection(unsigned short*** sinogram3D, PET
         }
     }
 
-    Offset = -((double)Parameters->GetTanBinNum()-1)/2;  // Position of the center of first bin
+    Offset = ((double)Parameters->GetTanBinNum()-1.0)/2.0;  // Position of the center of first bin
     Costheta = new double[Parameters->GetAngBinNum()];
     Sintheta = new double[Parameters->GetAngBinNum()];
 
@@ -58,7 +59,7 @@ FilteredBackProjection::FilteredBackProjection(unsigned short*** sinogram3D, PET
         YArray[i] = new double[Parameters->GetAngBinNum()];
     }
 
-    for(int j = 0; j  < Parameters->GetAngBinNum(); j++)
+    for(int j = 0; j < Parameters->GetAngBinNum(); j++)
     {
         double theta = j*M_PI/(double)Parameters->GetAngBinNum();
         Costheta[j] = cos(theta);
@@ -68,11 +69,11 @@ FilteredBackProjection::FilteredBackProjection(unsigned short*** sinogram3D, PET
     // Compute the coordinates of pixels of the image
     for(int i = 0; i < Parameters->GetTanBinNum(); i++)
     {
-        double step = (i-(Parameters->GetTanBinNum()-1)/2);
+        double step = ((double)i-(((double)Parameters->GetTanBinNum()-1.0)/2.0));
         for(int j = 0; j < Parameters->GetAngBinNum(); j++)
         {
             XArray[i][j] = step*Costheta[j];
-            YArray[i][j] = step*Sintheta[j]-Offset;
+            YArray[i][j] = step*Sintheta[j];
         }
     }
 
@@ -85,21 +86,21 @@ FilteredBackProjection::FilteredBackProjection(unsigned short*** sinogram3D, PET
     imageData->SetExtent(0, Parameters->GetTanBinNum()-1, 0, Parameters->GetTanBinNum()-1, 0, 0);
     imageData->SetSpacing(1.0, 1.0, 1.0);
     imageData->SetOrigin(0.0, 0.0, 0.0);
-    imageData->AllocateScalars(VTK_FLOAT, 1);
+    imageData->AllocateScalars(VTK_DOUBLE, 1);
 
     int* dims = imageData->GetDimensions();
     for (int y = 0; y < dims[1]; y++)
     {
         for (int x = 0; x < dims[0]; x++)
         {
-            float* pixel = static_cast<float*>(imageData->GetScalarPointer(x,y,0));
-            pixel[0] = (float)Sinogram2D[x][y][32];
+            double* pixel = static_cast<double*>(imageData->GetScalarPointer(x,y,0));
+            pixel[0] = (double)Image[x][y][31];
         }
     }
 
     vtkSmartPointer<vtkImageMapper> mapper = vtkSmartPointer<vtkImageMapper>::New();
     mapper->SetInputData(imageData);
-    mapper->SetColorWindow(0);
+    mapper->SetColorWindow(MaxBrightness);
     mapper->SetColorLevel(0);
 
     vtkSmartPointer<vtkActor2D> actor = vtkSmartPointer<vtkActor2D>::New();
@@ -126,13 +127,13 @@ void FilteredBackProjection::SortToSinogram2D(unsigned short*** sinogram3D)
     int numOfSlices = Parameters->GetRingNum();
     int* planesNorm = new int[numOfPlanes];
 
-    Sinogram2D = new float**[Parameters->GetTanBinNum()];
+    Sinogram2D = new double**[Parameters->GetTanBinNum()];
     for(int i = 0; i < Parameters->GetTanBinNum(); i++)
     {
-        Sinogram2D[i] = new float*[Parameters->GetAngBinNum()];
+        Sinogram2D[i] = new double*[Parameters->GetAngBinNum()];
         for(int j = 0; j < Parameters->GetAngBinNum(); j++)
         {
-            Sinogram2D[i][j] = new float[numOfPlanes];
+            Sinogram2D[i][j] = new double[numOfPlanes];
 
             for(int k = 0; k < numOfPlanes; k++)
             {
@@ -156,7 +157,7 @@ void FilteredBackProjection::SortToSinogram2D(unsigned short*** sinogram3D)
             {
                 if (planesNorm[k] > 1)
                 {
-                    Sinogram2D[i][j][k] = (float)(Sinogram2D[i][j][k]/(float)planesNorm[k]);
+                    Sinogram2D[i][j][k] = (double)(Sinogram2D[i][j][k]/(double)planesNorm[k]);
                 }
             }
         }
@@ -173,7 +174,7 @@ void FilteredBackProjection::CalculateFilter()
 
     // Calculate Hamming filter
     Filter = new double[outputFFTSize];
-    double alpha = 1;
+    double alpha = 0.75;
     double cutNFrequency = 0.75;
     double pixelSize = 1;
     // The cut-off frequency is expressed as a fraction of the Nq frequency.
@@ -182,10 +183,10 @@ void FilteredBackProjection::CalculateFilter()
     double cutFrequency = cutNFrequency/(2*pixelSize);  // Nyquist frecuency = 1 / (2*pixelSize)
     for(int sampleNum = 1; sampleNum < outputFFTSize; sampleNum++) // We calculate frequency for each sample in the frequency domain
     {
-        double sampleFrequency = (double)sampleNum/(pixelSize*(double)inputFFTSize);
-        if(sampleFrequency < cutFrequency)
+        double harmonicFrequency = (double)sampleNum/(pixelSize*(double)inputFFTSize);
+        if(harmonicFrequency < cutFrequency)
         {
-            Filter[sampleNum] = sampleFrequency*(alpha + (1.0-alpha)*cos(M_PI*sampleFrequency/cutFrequency));
+            Filter[sampleNum] = 1.0; //harmonicFrequency*(alpha + (1.0-alpha)*cos(M_PI*sampleNum/cutFrequency));
         } else
         {
             Filter[sampleNum] = 0.0;
@@ -217,16 +218,16 @@ void FilteredBackProjection::FFT()
 
             fftw_execute(planToFourier);
 
-            // Apply filter in frequency domain
-            outputData[0][0] = 0.0;
+            outputData[0][0] = 0.0;            // Handle zero freq. specially
             outputData[0][1] = 0.0;
-//            outputData[outputFFTSize-1][0] = outputData[outputFFTSize-1][0] * Filter[outputFFTSize-1];
-//            outputData[outputFFTSize-1][1] = outputData[outputFFTSize-1][1] * Filter[outputFFTSize-1];
+            //outputData[inputFFTSize/2][0] = outputData[inputFFTSize/2][0] * Filter[inputFFTSize/2]; // Handle half sampling freq.
+            //outputData[inputFFTSize/2][1] = outputData[inputFFTSize/2][1] * Filter[inputFFTSize/2];
 
             for(int i = 1; i < outputFFTSize; i++)
             {
-                outputData[i][0] = outputData[i][0] * Filter[i];
-                outputData[i][1] = outputData[i][1] * Filter[i];
+                // cout << "i = " << i << " " << (double)outputData[i][0] << " + i*" << (double)outputData[i][1] << endl;
+                outputData[i][0] = outputData[i][0]*Filter[i];
+                outputData[i][1] = outputData[i][1]*Filter[i];
             }
 
 
@@ -235,7 +236,7 @@ void FilteredBackProjection::FFT()
 
             for(int i = 0; i < Parameters->GetTanBinNum(); i++)
             {
-                Sinogram2D[i][j][k] = inputData[i]/*/inputFFTSize*/;
+                Sinogram2D[i][j][k] = inputData[i]/inputFFTSize;
             }
         }
 
@@ -249,26 +250,28 @@ void FilteredBackProjection::BackProject(int slice)
     {
         for(int y = 0; y < Parameters->GetTanBinNum(); y++)
         {
-            float sum = 0.0;
+            double sum = 0.0;
             for(int angle = 0; angle < Parameters->GetAngBinNum(); angle++)
             {
-                int dist = XArray[x][angle]+YArray[y][angle];
-                float w = dist - floor(dist);
+                double dist = XArray[x][angle] + YArray[y][angle];
+                int bin = (int)(floor(dist) + Parameters->GetTanBinNum()/2);
+                double w = dist - floor(dist);
 
                 // Using linear interpolation
-                if (dist >= 0 && dist < Parameters->GetTanBinNum()-1)
+                if (dist >= -Parameters->GetTanBinNum()/2 && dist < Parameters->GetTanBinNum()/2)
                 {
-                    sum = sum + (1-w)*Sinogram2D[dist][angle][slice]+w*Sinogram2D[dist+1][angle][slice];
-                } else if (dist == Parameters->GetTanBinNum()-1)
-                {
-                    sum = sum + (1-w)*Sinogram2D[dist][angle][slice];
-                } else if (dist == -1)
-                {
-                    sum = sum + w*Sinogram2D[0][angle][slice];
+                    if (bin >= 0 && bin < Parameters->GetTanBinNum()-1)
+                    {
+                        sum = sum + (1-w)*Sinogram2D[bin][angle][slice] + w*Sinogram2D[bin+1][angle][slice];
+                    }
+                    else if (bin == Parameters->GetTanBinNum()-1)
+                        sum = sum + (1-w)*Sinogram2D[bin][angle][slice];
                 }
             }
 
-            Image[x][y][slice] = (float)(sum*M_PI/(double)Parameters->GetAngBinNum());
+            Image[x][y][slice] = (double)(sum*M_PI/(double)Parameters->GetAngBinNum());
+            if (Image[x][y][slice] >= MaxBrightness)
+                MaxBrightness = Image[x][y][slice];
         }
     }
 }

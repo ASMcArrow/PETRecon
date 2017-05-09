@@ -23,22 +23,22 @@ int main(int argc,char *argv[])
     SinogramConverter* converter = new SinogramConverter(inputFileName, parameters);
     FilteredBackProjection* projector = new FilteredBackProjection(converter->GetSinogramArray(), parameters);
 
-    float*** image = projector->GetReconstructedImage();
+    double*** image = projector->GetReconstructedImage();
 
     // VTK visualization
 //    vtkSmartPointer<vtkImageData> imageData = vtkSmartPointer<vtkImageData>::New();
 //    imageData->SetExtent(0, parameters->GetTanBinNum()-1, 0, parameters->GetTanBinNum()-1, 0, 0);
 //    imageData->SetSpacing(1.0, 1.0, 1.0);
 //    imageData->SetOrigin(0.0, 0.0, 0.0);
-//    imageData->AllocateScalars(VTK_FLOAT, 1);
+//    imageData->AllocateScalars(VTK_double, 1);
 
 //    int* dims = imageData->GetDimensions();
 //    for (int y = 0; y < dims[1]; y++)
 //    {
 //        for (int x = 0; x < dims[0]; x++)
 //        {
-//            float* pixel = static_cast<float*>(imageData->GetScalarPointer(x,y,0));
-//            pixel[0] = (float)image[x][y][60];
+//            double* pixel = static_cast<double*>(imageData->GetScalarPointer(x,y,0));
+//            pixel[0] = (double)image[x][y][60];
 
 //        }
 //    }

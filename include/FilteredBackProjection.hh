@@ -10,7 +10,7 @@ public:
     FilteredBackProjection(unsigned short*** sinogram3D, PETParameters* parameters);
     ~FilteredBackProjection();
 
-    float*** GetReconstructedImage() { return Image; }
+    double*** GetReconstructedImage() { return Image; }
 
 private:
     void SortToSinogram2D(unsigned short ***sinogram3D);
@@ -19,8 +19,8 @@ private:
     void BackProject(int slice);
 
 
-    float*** Sinogram2D;
-    float*** Image;
+    double*** Sinogram2D;
+    double*** Image;
     PETParameters* Parameters;
     int inputFFTSize;
     int outputFFTSize;
@@ -31,6 +31,8 @@ private:
     double* Sintheta;
     double** XArray;
     double** YArray;
+
+    double MaxBrightness;
 };
 
 #endif // FILTEREDBACKPROJECTION_HH
